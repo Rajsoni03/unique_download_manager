@@ -65,6 +65,10 @@ def _stopped(task: Task, gen: Optional[int] = None) -> bool:
             or (gen is not None and gen != task.run_gen))
 
 
+def _interface_usable(mgr, ip: str) -> bool:
+    return any(iface.ip == ip for iface in mgr.monitor.usable())
+
+
 def _range_header(task: Task, chunk: Chunk, can_resume: bool) -> Optional[str]:
     if not task.supports_range:
         return None
@@ -89,7 +93,7 @@ def _write_pieces(mgr, task: Task, chunk: Chunk, resp, ip: str, expected_start: 
     with open(part, "r+b", buffering=0) as f:
         f.seek(expected_start)
         for piece in resp.iter_content(256 * 1024):
-            if _stopped(task, gen):
+            if _stopped(task, gen) or not _interface_usable(mgr, ip):
                 raise TaskStopped()
             if not piece:
                 continue
@@ -110,6 +114,9 @@ def _write_pieces(mgr, task: Task, chunk: Chunk, resp, ip: str, expected_start: 
 
 def _attempt(mgr, task: Task, chunk: Chunk, ip: str, gen: int) -> None:
     """One HTTP attempt for the current chunk. Raises on failure."""
+    if not _interface_usable(mgr, ip):
+        raise TaskStopped()
+
     can_resume = task.supports_range
     if not can_resume:
         # Cannot resume: restart this chunk from its beginning.
@@ -201,7 +208,7 @@ def chunk_worker(mgr, task: Task, chunk: Chunk, ip: str, gen: int) -> None:
     """Run by a manager-managed thread; retries with backoff until done/stopped."""
     net_err = True   # whether the previous failure looked like connectivity
     try:
-        while not _stopped(task, gen):
+        while not _stopped(task, gen) and _interface_usable(mgr, ip):
             try:
                 _attempt(mgr, task, chunk, ip, gen)
                 return
@@ -248,7 +255,8 @@ def chunk_worker(mgr, task: Task, chunk: Chunk, ip: str, gen: int) -> None:
             else:
                 delay = min(20.0, 2.0 ** min(chunk.attempts, 6))
             end_at = time.time() + delay
-            while time.time() < end_at and not _stopped(task, gen):
+            while (time.time() < end_at and not _stopped(task, gen)
+                   and _interface_usable(mgr, ip)):
                 time.sleep(0.2)
     finally:
         if not chunk.finished:

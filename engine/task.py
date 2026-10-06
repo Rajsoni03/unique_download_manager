@@ -94,6 +94,8 @@ class Task:
     @property
     def downloaded(self) -> int:
         with self.chunk_lock:
+            if self.status == State.COMPLETED and self.total is not None:
+                return self.total
             return sum(c.done for c in self.chunks)
 
     @property
@@ -105,6 +107,8 @@ class Task:
         return bool(self.filename)
 
     def progress(self) -> float:
+        if self.status == State.COMPLETED:
+            return 100.0
         if not self.total:
             return 0.0
         return min(100.0, self.downloaded * 100.0 / self.total)

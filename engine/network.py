@@ -246,19 +246,31 @@ class NetworkMonitor:
         with self.lock:
             return [i for i in self.interfaces.values() if i.enabled and i.up]
 
-    def snapshot(self) -> List[dict]:
+    def snapshot_state(self) -> dict:
         with self.lock:
-            out = []
-            for i in self.interfaces.values():
-                out.append({
-                    "name": i.name, "ip": i.ip, "kind": i.kind, "up": i.up,
-                    "enabled": i.enabled, "workers": i.workers,
-                    "app_speed": i.app_speed, "ema": i.ema_speed,
-                    "rx_speed": i.rx_speed, "tx_speed": i.tx_speed,
-                    "total_app_bytes": i.total_app_bytes,
-                    "speed_mbps": i.speed_mbps,
+            networks = []
+            for iface in self.interfaces.values():
+                networks.append({
+                    "name": iface.name, "ip": iface.ip, "kind": iface.kind, "up": iface.up,
+                    "enabled": iface.enabled, "workers": iface.workers,
+                    "app_speed": iface.app_speed, "ema": iface.ema_speed,
+                    "rx_speed": iface.rx_speed, "tx_speed": iface.tx_speed,
+                    "total_app_bytes": iface.total_app_bytes,
+                    "speed_mbps": iface.speed_mbps,
                 })
-            return out
+            active = [iface for iface in self.interfaces.values() if iface.up]
+            return {
+                "networks": networks,
+                "combined": {
+                    "app_speed": sum(iface.app_speed for iface in self.interfaces.values()),
+                    "system_rx": sum(iface.rx_speed for iface in active),
+                    "system_tx": sum(iface.tx_speed for iface in active),
+                    "history": list(self.history),
+                },
+            }
+
+    def snapshot(self) -> List[dict]:
+        return self.snapshot_state()["networks"]
 
     @property
     def combined_app_speed(self) -> float:

@@ -213,15 +213,11 @@ class DownloadManager:
                 "connections": self.settings.connections,
                 "enabled_ifaces": self.settings.enabled_ifaces,
             }
+        network_state = self.monitor.snapshot_state()
         return {
             "tasks": task_dicts,
-            "networks": self.monitor.snapshot(),
-            "combined": {
-                "app_speed": self.monitor.combined_app_speed,
-                "system_rx": self.monitor.combined_system_rx,
-                "system_tx": self.monitor.combined_system_tx,
-                "history": self.monitor.history_snapshot,
-            },
+            "networks": network_state["networks"],
+            "combined": network_state["combined"],
             "settings": settings,
             "active_count": sum(1 for t in task_dicts if t["status"] in State.ACTIVE),
             "queued_count": sum(1 for t in task_dicts if t["status"] == State.QUEUED),
@@ -655,10 +651,11 @@ class DownloadManager:
                     active = [t for t in self.tasks.values() if t.status in State.ACTIVE]
                     all_tasks = list(self.tasks.values())
                 for task in active:
-                    speed = task.win_total
-                    task.win_total = 0
-                    task.iface_speed = dict(task.win_iface)
-                    task.win_iface = {}
+                    with task.chunk_lock:
+                        speed = task.win_total
+                        task.win_total = 0
+                        task.iface_speed = dict(task.win_iface)
+                        task.win_iface = {}
                     task.speed = float(speed)
                     if task.total and task.speed > 0:
                         remaining = max(0, task.total - task.downloaded)
