@@ -521,8 +521,9 @@ async function act(id, action, body) {
 function renderTasks(snap) {
   const list = $("#taskList");
   const seen = new Set();
+  const tasks = [...snap.tasks].sort((a, b) => b.created - a.created);
 
-  snap.tasks.forEach((t, i) => {
+  tasks.forEach((t, i) => {
     seen.add(t.id);
     let entry = taskEls.get(t.id);
     if (!entry) entry = createTaskCard(t);
