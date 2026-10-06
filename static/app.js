@@ -252,15 +252,20 @@ function taskCardTemplate() {
       </div>
     </div>
 
-    <div class="progress-wrap">
-      <div class="progress" data-r="prog"><i style="width:0%"></i><b data-r="pct">0%</b></div>
-    </div>
+    <div class="progress-overview">
+      <div class="progress-wrap">
+        <div class="progress" data-r="prog" role="progressbar" aria-label="Download progress"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <i aria-hidden="true"></i><b data-r="pct">0%</b>
+        </div>
+      </div>
 
-    <div class="stats">
-      <div class="stat"><div class="k">Speed</div><div class="v accent" data-r="speed">—</div></div>
-      <div class="stat"><div class="k">ETA</div><div class="v" data-r="eta">—</div></div>
-      <div class="stat"><div class="k">Downloaded</div><div class="v dim" data-r="size">—</div></div>
-      <div class="stat"><div class="k">Connections</div><div class="v" data-r="conns">0</div></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Speed</div><div class="v accent" data-r="speed">—</div></div>
+        <div class="stat"><div class="k">ETA</div><div class="v" data-r="eta">—</div></div>
+        <div class="stat"><div class="k">Downloaded</div><div class="v dim" data-r="size">—</div></div>
+        <div class="stat"><div class="k">Connections</div><div class="v" data-r="conns">0</div></div>
+      </div>
     </div>
 
     <div class="iface-split" data-r="split" hidden>
@@ -337,9 +342,15 @@ function updateTaskCard(t, entry) {
   const pct = t.total ? Math.min(100, t.progress) : (done ? 100 : 0);
   const indeterminate = active && !t.total && t.status !== "resolving";
   refs.prog.classList.toggle("indeterminate", indeterminate);
-  refs.prog.querySelector("i").style.width = `${pct}%`;
-  refs.pct.textContent = indeterminate ? "" : `${pct.toFixed(pct > 0 && pct < 10 ? 2 : 1)}%`;
-  refs.pct.style.display = indeterminate || pct > 88 ? "none" : "";
+  refs.prog.style.setProperty("--progress", `${pct}%`);
+  refs.pct.textContent = indeterminate ? "..." : `${pct.toFixed(pct > 0 && pct < 10 ? 2 : 1)}%`;
+  if (indeterminate) {
+    refs.prog.removeAttribute("aria-valuenow");
+    refs.prog.setAttribute("aria-valuetext", "Progress unknown");
+  } else {
+    refs.prog.setAttribute("aria-valuenow", pct.toFixed(1));
+    refs.prog.setAttribute("aria-valuetext", `${pct.toFixed(1)}%`);
+  }
 
   /* stats */
   refs.speed.textContent = t.status === "waiting_network" ? "offline" : fmtBytes(t.speed, true);
