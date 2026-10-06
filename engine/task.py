@@ -53,6 +53,9 @@ class Task:
         self.priority = priority
         self.created = time.time()
         self.completed_at: Optional[float] = None
+        self.active_seconds = 0.0
+        self.active_since: Optional[float] = None
+        self.active_lock = threading.Lock()
 
         self.status = State.QUEUED
         self.error = ""
@@ -106,12 +109,41 @@ class Task:
     def is_resumable_file(self) -> bool:
         return bool(self.filename)
 
+    def start_active_clock(self) -> None:
+        with self.active_lock:
+            if self.active_since is None:
+                self.active_since = time.monotonic()
+
+    def stop_active_clock(self) -> None:
+        with self.active_lock:
+            if self.active_since is not None:
+                self.active_seconds += max(0.0, time.monotonic() - self.active_since)
+                self.active_since = None
+
+    def reset_active_clock(self) -> None:
+        with self.active_lock:
+            self.active_seconds = 0.0
+            if self.active_since is not None:
+                self.active_since = time.monotonic()
+
+    def active_elapsed(self) -> float:
+        with self.active_lock:
+            elapsed = self.active_seconds
+            if self.active_since is not None:
+                elapsed += max(0.0, time.monotonic() - self.active_since)
+            return elapsed
+
     def progress(self) -> float:
         if self.status == State.COMPLETED:
             return 100.0
         if not self.total:
             return 0.0
         return min(100.0, self.downloaded * 100.0 / self.total)
+
+    @property
+    def average_speed(self) -> float:
+        elapsed = self.active_elapsed()
+        return self.downloaded / elapsed if elapsed else 0.0
 
     def to_dict(self) -> dict:
         total = self.total or 0
@@ -128,6 +160,7 @@ class Task:
             "downloaded": self.downloaded,
             "progress": self.progress(),
             "speed": self.speed,
+            "average_speed": self.average_speed,
             "eta": self.eta,
             "priority": self.priority,
             "created": self.created,

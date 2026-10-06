@@ -539,6 +539,7 @@ input { font-family: inherit; }
 .chip-completed    { color: #6ee7b7; background: rgba(52,211,153,.1); border-color: rgba(52,211,153,.3); }
 .chip-failed       { color: #fca5a5; background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.32); }
 .chip-canceled     { color: #94a3b8; background: rgba(148,163,184,.09); border-color: rgba(148,163,184,.25); }
+.chip-nonresumable { color: #fdba74; background: rgba(251,146,60,.08); border-color: rgba(251,146,60,.3); }
 
 .task-host {
   font-size: 11.5px;
@@ -653,8 +654,21 @@ input { font-family: inherit; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.speed-values { display: grid; gap: 2px; margin-top: 2px; }
+.speed-line { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; }
+.speed-label { color: var(--text-faint); font-size: 9px; font-weight: 600; }
+.speed-line .v { font-size: 12px; margin-top: 0; }
 .stat .v.dim { color: var(--text-dim); font-weight: 600; }
 .stat .v.accent { color: var(--accent-2); }
+
+@media (max-width: 720px) {
+  .stat [data-r="size"] {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
 
 /* per-interface contribution */
 .iface-split { margin-top: 11px; }
@@ -702,6 +716,7 @@ input { font-family: inherit; }
   gap: 6px 12px;
   font-size: 12px;
 }
+.task-details[hidden] { display: none; }
 .task-details dt { color: var(--text-faint); font-weight: 600; }
 .task-details dd {
   margin: 0;

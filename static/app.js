@@ -316,6 +316,7 @@ function taskCardTemplate() {
         <div class="task-name-row">
           <h3 class="task-name placeholder" data-r="name">Resolving…</h3>
           <span class="chip chip-resolving" data-r="chip">RESOLVING</span>
+          <span class="chip chip-nonresumable" data-r="nonResumable" hidden>NON-RESUMABLE</span>
         </div>
         <div class="task-host" data-r="host"></div>
       </div>
@@ -353,7 +354,13 @@ function taskCardTemplate() {
       </div>
 
       <div class="stats">
-        <div class="stat"><div class="k">Speed</div><div class="v accent" data-r="speed">—</div></div>
+        <div class="stat speed-stat">
+          <div class="k">Speed</div>
+          <div class="speed-values">
+            <div class="speed-line"><span class="speed-label">Live</span><span class="v accent" data-r="speed">—</span></div>
+            <div class="speed-line"><span class="speed-label">Avg</span><span class="v" data-r="avgSpeed">—</span></div>
+          </div>
+        </div>
         <div class="stat"><div class="k">ETA</div><div class="v" data-r="eta">—</div></div>
         <div class="stat"><div class="k">Downloaded</div><div class="v dim" data-r="size">—</div></div>
         <div class="stat"><div class="k">Connections</div><div class="v" data-r="conns">0</div></div>
@@ -416,6 +423,7 @@ function updateTaskCard(t, entry) {
   /* status chip */
   refs.chip.textContent = STATUS_LABEL[t.status] || t.status;
   refs.chip.className = `chip chip-${t.status === "waiting_network" ? "waiting" : t.status}`;
+  refs.nonResumable.hidden = !t.final_url || t.supports_range;
 
   /* action buttons */
   const canPause = ["resolving", "downloading", "waiting_network", "queued"].includes(t.status);
@@ -446,6 +454,7 @@ function updateTaskCard(t, entry) {
 
   /* stats */
   refs.speed.textContent = t.status === "waiting_network" ? "offline" : fmtBytes(t.speed, true);
+  refs.avgSpeed.textContent = fmtBytes(t.average_speed, true);
   refs.eta.textContent = done ? "done" : fmtEta(t.eta);
   refs.size.textContent = t.total
     ? `${fmtBytes(t.downloaded)} / ${fmtBytes(t.total)}`

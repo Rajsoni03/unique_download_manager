@@ -76,6 +76,7 @@ class DownloadManager:
             active = [t for t in self.tasks.values() if t.status in State.ACTIVE]
         for t in active:
             t.pause.set()
+            t.stop_active_clock()
         # Persist whatever we have right now.
         self._persist_state()
         for t in self.tasks.values():
@@ -109,6 +110,7 @@ class DownloadManager:
     def pause(self, task_id: str) -> None:
         task = self._get(task_id)
         if task.status in (State.QUEUED, State.RESOLVING, State.DOWNLOADING, State.WAITING):
+            task.stop_active_clock()
             task.pause.set()
             task.status = State.PAUSED
             task.speed = 0.0
@@ -138,6 +140,7 @@ class DownloadManager:
         task = self._get(task_id)
         if task.status in State.FINISHED:
             return
+        task.stop_active_clock()
         task.cancel.set()
         task.pause.clear()
         if task.thread is None or not task.thread.is_alive():
@@ -270,9 +273,11 @@ class DownloadManager:
             if not self._prepare_storage(task):
                 self._stop_cleanup(task)
                 return
+            task.start_active_clock()
 
             while True:
                 if task.cancel.is_set():
+                    task.stop_active_clock()
                     self._join(workers)
                     self._cleanup_files(task)
                     task.status = State.CANCELED
@@ -280,6 +285,7 @@ class DownloadManager:
                     task.connections_active = 0
                     return
                 if task.pause.is_set():
+                    task.stop_active_clock()
                     self._join(workers)
                     storage.save_meta(task.directory, task)
                     # Re-check: resume() may have cleared the pause while we were
@@ -291,6 +297,7 @@ class DownloadManager:
                         self._state_dirty = True
                     return
                 if task.fail.is_set():
+                    task.stop_active_clock()
                     self._join(workers)
                     storage.save_meta(task.directory, task)
                     if task.fail.is_set():
@@ -368,6 +375,7 @@ class DownloadManager:
     def _stop_cleanup(self, task: Task) -> None:
         """If a run stopped because of cancel, remove partial files/reservation."""
         if task.cancel.is_set():
+            task.stop_active_clock()
             self._cleanup_files(task)
             task.status = State.CANCELED
             task.speed = 0.0
@@ -482,6 +490,7 @@ class DownloadManager:
                         time.sleep(min(15.0, 1.5 ** min(attempt, 8)))
 
         # ---- fresh start
+        task.reset_active_clock()
         self._reset_storage(task)
         task.status = State.DOWNLOADING
         return True
@@ -512,6 +521,8 @@ class DownloadManager:
     def _reset_storage(self, task: Task) -> None:
         part = storage.part_path(task.directory, task.filename)
         storage.delete_meta(task.directory, task.id)
+        with task.chunk_lock:
+            task.iface_bytes.clear()
         try:
             if os.path.exists(part):
                 os.remove(part)
@@ -532,6 +543,7 @@ class DownloadManager:
         storage.save_meta(task.directory, task)
 
     def _reset_to_single_connection(self, task: Task) -> None:
+        task.reset_active_clock()
         task.supports_range = False
         with task.chunk_lock:
             for c in task.chunks:
@@ -587,6 +599,7 @@ class DownloadManager:
     # ------------------------------------------------------------------ finishing
 
     def _finalize(self, task: Task) -> None:
+        task.stop_active_clock()
         part = storage.part_path(task.directory, task.filename)
         final_name = task.filename
         final_path = os.path.join(task.directory, final_name)
@@ -611,6 +624,7 @@ class DownloadManager:
             self._state_dirty = True
 
     def _fail(self, task: Task, message: str) -> None:
+        task.stop_active_clock()
         task.fail.set()
         task.status = State.FAILED
         task.error = message[:500]
@@ -682,7 +696,7 @@ class DownloadManager:
                     if task.filename and task.chunks:
                         with task.chunk_lock:
                             storage.save_meta(task.directory, task)
-                if dirty:
+                if dirty or active:
                     self._persist_state()
             except Exception:
                 pass
@@ -693,6 +707,8 @@ class DownloadManager:
         with self.lock:
             tasks = []
             for t in self.tasks.values():
+                with t.chunk_lock:
+                    iface_bytes = dict(t.iface_bytes)
                 tasks.append({
                     "id": t.id, "url": t.url, "directory": t.directory,
                     "filename": t.filename, "priority": t.priority,
@@ -703,6 +719,8 @@ class DownloadManager:
                     "content_type": t.content_type,
                     "chunk_size": t.chunk_size,
                     "completed_at": t.completed_at,
+                    "active_seconds": t.active_elapsed(),
+                    "iface_bytes": iface_bytes,
                 })
             settings = {
                 "directory": self.settings.directory,
@@ -730,6 +748,13 @@ class DownloadManager:
                 task.content_type = item.get("content_type", "")
                 task.chunk_size = int(item.get("chunk_size", 0))
                 task.completed_at = item.get("completed_at")
+                raw_iface_bytes = item.get("iface_bytes")
+                if isinstance(raw_iface_bytes, dict):
+                    task.iface_bytes = {
+                        str(ip): max(0, int(byte_count))
+                        for ip, byte_count in raw_iface_bytes.items()
+                        if int(byte_count) > 0
+                    }
                 task.meta_resolved = bool(task.final_url)
 
                 status = item.get("status", State.QUEUED)
@@ -750,6 +775,14 @@ class DownloadManager:
                     # Downloads that were running are resumed automatically;
                     # explicitly paused ones wait for the user to resume them.
                     task.status = State.PAUSED if status == State.PAUSED else State.QUEUED
+
+                saved_active_seconds = item.get("active_seconds")
+                if saved_active_seconds is not None:
+                    task.active_seconds = max(0.0, float(saved_active_seconds))
+                elif task.status == State.COMPLETED and task.completed_at is not None:
+                    task.active_seconds = max(0.0, task.completed_at - task.created)
+                elif task.chunks and task.downloaded:
+                    task.active_seconds = max(0.0, time.time() - task.created)
                 self.tasks[task.id] = task
             except Exception:
                 continue

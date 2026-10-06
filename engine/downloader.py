@@ -120,9 +120,14 @@ def _attempt(mgr, task: Task, chunk: Chunk, ip: str, gen: int) -> None:
     can_resume = task.supports_range
     if not can_resume:
         # Cannot resume: restart this chunk from its beginning.
+        restarted = False
         with task.chunk_lock:
             if chunk.done:
                 chunk.done = 0
+                task.iface_bytes.clear()
+                restarted = True
+        if restarted:
+            task.reset_active_clock()
 
     start = chunk.start + (chunk.done if can_resume else 0)
     if chunk.end is not None and can_resume and start > chunk.end:
