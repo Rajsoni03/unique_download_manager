@@ -131,8 +131,9 @@ echo "--------------------[ Starting Server - $(date) ]--------------------" >> 
 echo "--------------------[ Starting Server - $(date) ]--------------------" >> logs/error.log
 
 # Start the server
+echo ""
+echo "🚀 Launching server..."
 echo "🌟 Starting server on http://localhost:$APPLICATION_PORT and http://0.0.0.0:$APPLICATION_PORT"
-echo "🔋 Health check: http://localhost:$APPLICATION_PORT/health"
 echo ""
 
 python app.py --host $APPLICATION_HOST --port $APPLICATION_PORT >> logs/access.log 2>> logs/error.log &

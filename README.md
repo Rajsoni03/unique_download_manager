@@ -30,14 +30,23 @@ venv/bin/pip install -r requirements.txt
 venv/bin/python app.py                 # serves http://127.0.0.1:8765
 ```
 
-You can also launch it with `./start.sh`, which uses the project virtualenv and
-forwards options to `app.py`:
+To use the `start.sh` launcher, run it from the project directory:
 
 ```sh
-./start.sh --host 0.0.0.0 --port 5000
+./start.sh
 ```
 
-Then open <http://127.0.0.1:8765>, paste a direct file URL, and download.
+It starts the server in the background at <http://127.0.0.1:8765> and writes
+logs to `logs/access.log` and `logs/error.log`. Use `./start.sh --debug` to run
+in the foreground, or `./start.sh --help` for the launcher's options. The script
+currently fixes the bind address to `0.0.0.0` and the port to `8765`; it does not
+accept `--host` or `--port` arguments.
+
+On Linux, the launcher may use `sudo` to install `lsof` and add an inbound
+iptables rule for port 8765. If that port is already occupied, it asks before
+force-killing the process using it. The app has no authentication, so only run
+this launcher on a trusted network. For a foreground launch without these
+launcher side effects, use `venv/bin/python app.py --host 127.0.0.1 --port 8765`.
 
 ### CLI options
 
