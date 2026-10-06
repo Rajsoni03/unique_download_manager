@@ -284,13 +284,15 @@ function createTaskCard(t) {
   card.innerHTML = taskCardTemplate();
   const refs = {};
   $$("[data-r]", card).forEach((n) => (refs[n.dataset.r] = n));
-  const entry = { card, refs };
+  const actions = {};
+  $$("[data-act]", card).forEach((n) => (actions[n.dataset.act] = n));
+  const entry = { card, refs, actions };
   taskEls.set(t.id, entry);
   return entry;
 }
 
 function updateTaskCard(t, entry) {
-  const { card, refs } = entry;
+  const { card, refs, actions } = entry;
   const active = ACTIVE_STATES.has(t.status);
   const done = t.status === "completed";
 
@@ -323,13 +325,13 @@ function updateTaskCard(t, entry) {
   const canResume = ["paused", "failed"].includes(t.status);
   const canCancel = active || t.status === "queued";
   const showReveal = done && t.path;
-  setBtn(refs.pause, canPause, () => act(t.id, "pause"));
-  setBtn(refs.resume, canResume, () => act(t.id, "resume"));
-  setBtn(refs.cancel, canCancel, () => act(t.id, "cancel"));
-  setBtn(refs.reveal, showReveal, () => api("/api/open", "POST", { path: t.path })
+  setBtn(actions.pause, canPause, () => act(t.id, "pause"));
+  setBtn(actions.resume, canResume, () => act(t.id, "resume"));
+  setBtn(actions.cancel, canCancel, () => act(t.id, "cancel"));
+  setBtn(actions.reveal, showReveal, () => api("/api/open", "POST", { path: t.path })
     .catch((e) => toast(e.message, "err")));
-  refs.up.onclick = () => act(t.id, "priority", { delta: 1 });
-  refs.down.onclick = () => act(t.id, "priority", { delta: -1 });
+  actions.up.onclick = () => act(t.id, "priority", { delta: 1 });
+  actions.down.onclick = () => act(t.id, "priority", { delta: -1 });
 
   /* progress */
   const pct = t.total ? Math.min(100, t.progress) : (done ? 100 : 0);

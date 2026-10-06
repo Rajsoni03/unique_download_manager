@@ -93,6 +93,21 @@ class FixtureHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
+        if self.path.startswith("/range_page"):
+            body = b"<!doctype html><html><body>login please</body></html>"
+            match = re.match(r"bytes=(\d+)-(\d*)", self.headers.get("Range", ""))
+            start = int(match.group(1)) if match else 0
+            end = min(int(match.group(2)) if match and match.group(2) else len(body) - 1,
+                      len(body) - 1)
+            sample = body[start:end + 1]
+            self.send_response(206)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Range", f"bytes {start}-{end}/{len(body)}")
+            self.send_header("Content-Length", str(len(sample)))
+            self.end_headers()
+            self.wfile.write(sample)
+            return
+
         if self.path.startswith("/redirect"):
             self.send_response(302)
             self.send_header("Location", "/big.bin")
@@ -363,6 +378,14 @@ def main():
         check("failed", f9 and f9["status"] == "failed", f"status={f9['status'] if f9 else '?'}")
         check("explains it is a web page", "web page" in (f9["error"] if f9 else ""),
               f"err={f9['error'][:80] if f9 else ''}")
+
+        t9_range = mgr.add(f"{main_srv.url}/range_page")
+        f9_range = wait_status(mgr, t9_range.id, ("failed", "completed"), timeout=30)
+        check("range response HTML is rejected",
+              f9_range and f9_range["status"] == "failed"
+              and "web page" in f9_range["error"],
+              f"status={f9_range['status'] if f9_range else '?'} "
+              f"err={f9_range['error'][:80] if f9_range else ''}")
 
         print("\n8) Unknown-length chunked stream (no Content-Length)")
         t10 = mgr.add(f"{main_srv.url}/stream")

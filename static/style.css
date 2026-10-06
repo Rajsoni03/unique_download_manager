@@ -571,6 +571,7 @@ input { font-family: inherit; }
   cursor: pointer;
   transition: .14s;
 }
+.tbtn[hidden] { display: none; }
 .tbtn:hover { color: var(--text); border-color: #31465f; background: #1b2839; }
 .tbtn svg { width: 15px; height: 15px; }
 .tbtn.danger:hover { color: var(--red); border-color: rgba(248,113,113,.4); }
@@ -948,7 +949,12 @@ input[type="range"] {
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
   }
-  .net-card { min-width: 235px; scroll-snap-align: start; flex: none; }
+  .net-card {
+    width: 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    flex: 0 0 100%;
+  }
   .net-hint { display: none; }
   .net-combined { padding: 13px 15px; }
 }
@@ -968,11 +974,16 @@ input[type="range"] {
   .dir-chip { max-width: 130px; }
 
   .task-card { padding: 13px 13px 12px; }
-  .task-top { gap: 9px; }
+  .task-top { flex-wrap: wrap; gap: 9px; }
   .file-ico { width: 34px; height: 34px; border-radius: 9px; }
   .task-name { font-size: 13.5px; }
 
-  .task-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 74px; }
+  .task-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    max-width: none;
+  }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .field-row { grid-template-columns: 1fr; gap: 0; }

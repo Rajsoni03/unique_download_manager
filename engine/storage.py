@@ -175,13 +175,13 @@ def build_filename(meta: MetaResult, original_url: str) -> str:
 def resolve_meta(url: str, timeout: float = 25.0) -> MetaResult:
     """Probe a URL: follow redirects, detect range support, size, headers.
 
-    Uses a 1-byte range GET (works on servers that reject HEAD).
+    Uses a short range GET (works on servers that reject HEAD).
     Raises FetchError for unusable URLs (HTML pages, HTTP errors…).
     """
     headers = {"User-Agent": UA, "Accept": "*/*"}
     try:
         resp = requests.get(
-            url, headers={**headers, "Range": "bytes=0-0"},
+            url, headers={**headers, "Range": "bytes=0-1023"},
             stream=True, timeout=(10, timeout), allow_redirects=True,
         )
     except requests.exceptions.MissingSchema as exc:
