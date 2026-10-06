@@ -15,9 +15,14 @@ import psutil
 _EXCLUDE_PREFIXES = (
     "lo", "docker", "br-", "veth", "virbr", "vmnet", "vboxnet",
     "awdl", "llw", "gif", "stf", "tun", "utun", "apml", "ipsec",
-    "ppp", "bluetooth", "ap", "hotspot",
+    "ppp", "bluetooth", "ap", "hotspot", "tailscale",
 )
 _EXCLUDE_EXACT = {"lo", "awdl0", "llw0"}
+
+
+def _is_excluded_interface(name: str) -> bool:
+    low = name.lower()
+    return low in _EXCLUDE_EXACT or low.startswith(_EXCLUDE_PREFIXES)
 
 _KIND_USB = ("rndis", "usb", "tether", "cdc", "ncm", "usbnet", "hardlink", "lan78")
 _KIND_WIFI = ("wl", "wifi", "airport", "wlan", "p2p", "hotspot", "ap")
@@ -127,8 +132,7 @@ class NetworkMonitor:
             pass
 
         for name, entries in addrs.items():
-            low = name.lower()
-            if low in _EXCLUDE_EXACT or low.startswith(_EXCLUDE_PREFIXES):
+            if _is_excluded_interface(name):
                 continue
             for e in entries:
                 if e.family.name != "AF_INET":

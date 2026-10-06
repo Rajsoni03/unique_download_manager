@@ -441,7 +441,12 @@ def main():
         mgr.update_settings({"max_downloads": 3})
 
         print("\n11) Load balancer: least-loaded + speed-weighted NIC selection")
-        from engine.network import Interface
+            from engine.network import Interface, _is_excluded_interface
+            check("Tailscale excluded; Ethernet and Wi-Fi retained",
+              _is_excluded_interface("tailscale0")
+              and _is_excluded_interface("Tailscale0")
+              and not _is_excluded_interface("eth0")
+              and not _is_excluded_interface("wlan0"))
         with mgr.monitor.lock:
             mgr.monitor.interfaces = {
                 "wifi": Interface(name="wifi", ip="10.0.0.2", kind="Wi-Fi"),
