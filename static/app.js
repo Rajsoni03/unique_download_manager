@@ -100,6 +100,7 @@ function renderHeader(snap) {
   $("#hdrSpeed").textContent = fmtBytes(c.app_speed, true);
   $("#hdrTx").textContent = fmtBytes(c.system_tx, true);
   $("#comboSpeed").textContent = fmtBytes(c.app_speed, true);
+  renderSpeedChart(c.history);
   $("#comboTx").textContent = `↑ ${fmtBytes(c.system_tx, true)}`;
   const up = snap.networks.filter((n) => n.up);
   const enabled = up.filter((n) => n.enabled);
@@ -112,6 +113,41 @@ function renderHeader(snap) {
     : "no active network";
   $("#queueSummary").textContent =
     `${snap.active_count} downloading · ${snap.queued_count} queued · ${fmtBytes(c.app_speed, true)}`;
+}
+
+let speedHistorySignature = null;
+
+function renderSpeedChart(history) {
+  const line = $("#speedChartLine");
+  const area = $("#speedChartArea");
+  if (!line || !area) return;
+
+  const samples = (Array.isArray(history) ? history : [])
+    .slice(-90)
+    .map((value) => Math.max(0, Number(value) || 0));
+  const signature = samples.join(",");
+  if (signature === speedHistorySignature) return;
+  speedHistorySignature = signature;
+
+  if (samples.length === 0) samples.push(0, 0);
+  else if (samples.length === 1) samples.unshift(samples[0]);
+
+  const max = Math.max(...samples, 0);
+  const width = 180;
+  const height = 32;
+  const padding = 2;
+  const points = samples.map((value, index) => {
+    const x = index * width / (samples.length - 1);
+    const y = height - padding - (max ? value / max : 0) * (height - padding * 2);
+    return [x, y];
+  });
+  const linePath = points.map(([x, y], index) =>
+    `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`
+  ).join(" ");
+  const [first] = points;
+  const last = points[points.length - 1];
+  line.setAttribute("d", linePath);
+  area.setAttribute("d", `${linePath} L ${last[0].toFixed(1)} ${height} L ${first[0].toFixed(1)} ${height} Z`);
 }
 
 /* ------------------------------ networks ----------------------------- */

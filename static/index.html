@@ -56,6 +56,11 @@
         <i class="flow-port flow-output-port" data-flow-output></i>
         <div class="flow-output-label">YOUR CONNECTION</div>
         <div class="flow-output-speed"><span>↓</span><b id="comboSpeed">—</b></div>
+        <svg class="flow-speed-chart" id="speedChart" viewBox="0 0 180 32" preserveAspectRatio="none" role="img" aria-label="Combined download speed over recent samples">
+          <path class="speed-chart-grid" d="M0 8H180 M0 16H180 M0 24H180"></path>
+          <path id="speedChartArea" class="speed-chart-area"></path>
+          <path id="speedChartLine" class="speed-chart-line"></path>
+        </svg>
         <div class="flow-output-state"><i class="dot dot-live"></i><span id="comboIfaces">0 networks active</span></div>
         <div class="flow-output-meta"><span id="comboTx">↑ —</span><span id="activeConnLabel">0 connections</span></div>
       </div>
