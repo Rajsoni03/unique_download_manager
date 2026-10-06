@@ -208,3 +208,4 @@ __marimo__/
 
 # Application specific ignores
 db/
+logs/

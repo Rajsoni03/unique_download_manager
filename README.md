@@ -30,6 +30,13 @@ venv/bin/pip install -r requirements.txt
 venv/bin/python app.py                 # serves http://127.0.0.1:8765
 ```
 
+You can also launch it with `./start.sh`, which uses the project virtualenv and
+forwards options to `app.py`:
+
+```sh
+./start.sh --host 0.0.0.0 --port 5000
+```
+
 Then open <http://127.0.0.1:8765>, paste a direct file URL, and download.
 
 ### CLI options
@@ -42,6 +49,25 @@ venv/bin/python app.py [--host 127.0.0.1] [--port 8765] [--dir ~/Downloads] \
 - `--dir` — default download directory.
 - `--data-dir` — where `settings.json` + `downloadings.json` live (default `./db`
   in the project directory, or `UDM_HOME`).
+
+### Run as a system service on Jetson
+
+The sample unit at `deploy/unique-download-manager.service` runs as `raj`, uses
+the project virtualenv, and listens on `0.0.0.0:5000`. Stop any manually started
+instance first so it releases port 5000, then run on the Jetson:
+
+```sh
+cd ~/Development/unique_download_manager
+sudo install -D -m 644 deploy/unique-download-manager.service /etc/systemd/system/unique-download-manager.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now unique-download-manager.service
+sudo systemctl status unique-download-manager.service --no-pager
+```
+
+The service starts after reboot and restarts after unexpected failures. Follow
+its logs with `sudo journalctl -u unique-download-manager.service -f`. The unit
+uses Jetson-specific paths; update `User`, `WorkingDirectory`, and `ExecStart`
+when installing on another machine.
 
 ### Restart safety
 
