@@ -30,7 +30,7 @@ def _task_json(task) -> tuple:
 
 @app.after_request
 def add_cors(resp):
-    # The browser extension and LAN devices need open access to the API.
+    # LAN devices need open access to the API.
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
@@ -229,7 +229,8 @@ def main(argv=None):
     global MANAGER
     args = parse_args(argv)
     data_dir = args.data_dir or os.path.join(
-        os.environ.get("UDM_HOME") or os.path.join(os.path.expanduser("~"), ".udm"))
+        os.environ.get("UDM_HOME")
+        or os.path.join(os.path.dirname(os.path.abspath(__file__)), "db"))
     default_dir = args.dir or default_download_dir()
     MANAGER = DownloadManager(data_dir=data_dir, default_dir=default_dir)
 

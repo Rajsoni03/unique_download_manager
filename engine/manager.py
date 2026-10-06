@@ -47,6 +47,7 @@ class DownloadManager:
         os.makedirs(data_dir, exist_ok=True)
         self.settings = Settings(data_dir, default_dir or default_download_dir())
         os.makedirs(self.settings.directory, exist_ok=True)
+        self.settings.save()   # ensure ./db/settings.json exists even on first boot
 
         self.monitor = NetworkMonitor()
         self._apply_iface_settings()
@@ -712,11 +713,11 @@ class DownloadManager:
                 "connections": self.settings.connections,
                 "enabled_ifaces": self.settings.enabled_ifaces,
             }
-        storage.save_state(os.path.join(self.data_dir, "state.json"),
+        storage.save_state(os.path.join(self.data_dir, "downloadings.json"),
                            {"tasks": tasks, "settings": settings})
 
     def _restore_state(self) -> None:
-        raw = storage.load_state(os.path.join(self.data_dir, "state.json"))
+        raw = storage.load_state(os.path.join(self.data_dir, "downloadings.json"))
         for item in raw.get("tasks", []):
             try:
                 task = Task(url=item["url"], directory=item["directory"],
@@ -747,10 +748,11 @@ class DownloadManager:
                     meta = storage.load_meta(task.directory, task.id) if task.filename else None
                     if task.filename and meta and os.path.exists(part):
                         self._restore_chunks(task, meta)
-                        task.status = State.PAUSED
                     else:
-                        task.status = State.QUEUED
                         task.meta_resolved = False
+                    # Downloads that were running are resumed automatically;
+                    # explicitly paused ones wait for the user to resume them.
+                    task.status = State.PAUSED if status == State.PAUSED else State.QUEUED
                 self.tasks[task.id] = task
             except Exception:
                 continue

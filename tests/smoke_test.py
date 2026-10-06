@@ -10,6 +10,7 @@ Usage:  python3 tests/smoke_test.py
 """
 
 import http.server
+import hashlib
 import os
 import re
 import shutil
@@ -26,6 +27,7 @@ FILE_SIZE = 48 * 1024 * 1024          # 48 MB fixture payload
 THROTTLE = 9_000_000                  # ~9 MB/s so timing-sensitive tests hold
 _P = zlib.compress(os.urandom(6 * 1024 * 1024))
 FIXTURE = (_P * (FILE_SIZE // len(_P) + 1))[:FILE_SIZE]
+FIXTURE_HASH = hashlib.sha256(FIXTURE).hexdigest()
 
 
 class FixtureHandler(http.server.BaseHTTPRequestHandler):
@@ -50,9 +52,10 @@ class FixtureHandler(http.server.BaseHTTPRequestHandler):
 
     def _send_body(self, body: bytes) -> None:
         piece = 256 * 1024
+        rate = self.state.get("throttle", THROTTLE)
         for i in range(0, len(body), piece):
             self.wfile.write(body[i:i + piece])
-            time.sleep(len(body[i:i + piece]) / THROTTLE)
+            time.sleep(len(body[i:i + piece]) / rate)
 
     def _common_headers(self, extra=None):
         for k, v in (extra or {}).items():
@@ -442,6 +445,32 @@ def main():
                                    ("tasks", "networks", "combined", "settings",
                                     "active_count", "queued_count")))
         check("combined history present", isinstance(snap["combined"]["history"], list))
+
+        print("\n13) Server restart recovers state and resumes running downloads")
+        data2 = os.path.join(tmp, "data2")
+        mgr2 = DownloadManager(data_dir=data2, default_dir=downloads)
+        r = mgr2.add(f"{main_srv.url}/big.bin")
+        wait_downloaded(mgr2, r.id, 2 * 1024 * 1024, timeout=60)
+        mgr2.shutdown()          # simulate a server restart mid-download
+        check("state files written",
+              os.path.exists(os.path.join(data2, "settings.json")) and
+              os.path.exists(os.path.join(data2, "downloadings.json")))
+        mgr3 = DownloadManager(data_dir=data2, default_dir=downloads)   # "restart"
+        resumed = wait_status(mgr3, r.id, ("downloading", "completed", "failed"), timeout=120)
+        check("auto-resumed after restart",
+              resumed and resumed["status"] != "failed",
+              f"status={resumed['status'] if resumed else '?'} "
+              f"err={(resumed or {}).get('error', '')[:80]}")
+        done = wait_status(mgr3, r.id, ("completed", "failed"), timeout=120)
+        r_path = os.path.join(downloads, (done or {}).get("filename", ""))
+        r_ok = bool(done and os.path.exists(r_path)
+                    and os.path.getsize(r_path) == FILE_SIZE)
+        if r_ok:
+            with open(r_path, "rb") as fh:
+                r_ok = hashlib.sha256(fh.read()).hexdigest() == FIXTURE_HASH
+        check("restart-resumed byte-exact", r_ok,
+              f"err={(done or {}).get('error', '')[:80]}")
+        mgr3.shutdown()
     finally:
         mgr.shutdown()
         main_srv.stop()
