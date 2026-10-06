@@ -112,69 +112,50 @@ function renderHeader(snap) {
     : "no active network";
   $("#queueSummary").textContent =
     `${snap.active_count} downloading · ${snap.queued_count} queued · ${fmtBytes(c.app_speed, true)}`;
-  renderSpark(c.history || []);
-}
-
-function renderSpark(history) {
-  const line = $("#sparkLine"), fill = $("#sparkFill");
-  if (!history.length) { line.setAttribute("points", ""); fill.setAttribute("points", ""); return; }
-  const max = Math.max(...history, 1);
-  const n = history.length;
-  const pts = history.map((v, i) => {
-    const x = n === 1 ? 120 : (i / (n - 1)) * 120;
-    const y = 43 - (v / max) * 40;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  line.setAttribute("points", pts.join(" "));
-  fill.setAttribute("points", `0,44 ${pts.join(" ")} 120,44`);
 }
 
 /* ------------------------------ networks ----------------------------- */
 
 const netEls = new Map();
+let flowSignature = null;
+let flowFrame = 0;
+let flowNetworks = [];
 
 function renderNetworks(snap) {
   const list = $("#netList");
   const seen = new Set();
-  const maxSpeed = Math.max(1, ...snap.networks.map((n) => n.app_speed));
 
   snap.networks.forEach((n, i) => {
     seen.add(n.name);
     let refs = netEls.get(n.name);
     if (!refs) {
       const card = document.createElement("div");
-      card.className = "net-card";
+      card.className = "net-source";
       card.innerHTML = `
-        <div class="net-card-head">
+        <div class="net-source-head">
+          <div class="net-source-identity">
           <span class="iface-kind"></span>
           <span class="iface-name"></span>
-          <span class="iface-ip"></span>
+          </div>
           <label class="switch" title="Use this network for downloads">
-            <input type="checkbox"><i></i>
+            <input type="checkbox" aria-label="Use network for downloads"><i></i>
           </label>
         </div>
-        <div class="net-card-rows">
-          <span>Download <b data-r="app">—</b></span>
-          <span>System <b data-r="sys">—</b></span>
+        <div class="net-source-data">
+          <span class="source-state" data-r="state">Connected</span>
+          <b class="source-speed" data-r="speed">0 B/s</b>
         </div>
-        <div class="util-bar"><i data-r="util" style="width:0%"></i></div>
-        <div class="net-card-foot">
-          <span data-r="state">up</span>
-          <span class="workers-chip" data-r="workers">0 conns</span>
-        </div>`;
+        <i class="flow-port flow-source-port" data-flow-source></i>`;
       const color = IFACE_COLORS[i % IFACE_COLORS.length];
       card.style.setProperty("--iface-color", color);
       refs = {
         card,
         kind: $(".iface-kind", card),
         name: $(".iface-name", card),
-        ip: $(".iface-ip", card),
+        speed: $("[data-r='speed']", card),
+        st: $("[data-r='state']", card),
         toggle: $('input[type="checkbox"]', card),
-        app: $('[data-r="app"]', card),
-        sys: $('[data-r="sys"]', card),
-        util: $('[data-r="util"]', card),
-        st: $('[data-r="state"]', card),
-        wk: $('[data-r="workers"]', card),
+        port: $("[data-flow-source]", card),
       };
       refs.toggle.addEventListener("change", () => toggleIface(n.name, refs.toggle.checked));
       netEls.set(n.name, refs);
@@ -182,14 +163,10 @@ function renderNetworks(snap) {
     }
     refs.kind.textContent = n.kind;
     refs.name.textContent = n.name;
-    refs.ip.textContent = n.ip;
-    refs.app.textContent = fmtBytes(n.app_speed, true);
-    refs.sys.textContent = `↓${fmtBytes(n.rx_speed, true)} ↑${fmtBytes(n.tx_speed, true)}`;
-    refs.util.style.width = `${Math.min(100, (n.app_speed / maxSpeed) * 100)}%`;
-    refs.wk.textContent = `${n.workers} conn${n.workers === 1 ? "" : "s"}`;
-    refs.st.innerHTML = n.up
-      ? `<i class="dot dot-live"></i>${n.speed_mbps ? n.speed_mbps + " Mbps" : "connected"}`
-      : `<i class="dot" style="background:var(--red)"></i>disconnected`;
+    refs.speed.textContent = fmtBytes(n.app_speed, true);
+    refs.st.textContent = !n.up ? "Offline" : (n.enabled ? "Online" : "Disabled");
+    refs.card.title = `${n.kind} · ${n.name} · ${n.ip}`;
+    refs.toggle.setAttribute("aria-label", `Use ${n.name} for downloads`);
     if (refs.toggle.checked !== n.enabled) refs.toggle.checked = n.enabled;
     refs.card.classList.toggle("off", !n.enabled);
     refs.card.classList.toggle("down", !n.up);
@@ -200,7 +177,86 @@ function renderNetworks(snap) {
   netEls.forEach((refs, name) => {
     if (!seen.has(name)) { refs.card.remove(); netEls.delete(name); }
   });
+
+  const map = $("#networkMap");
+  const signature = snap.networks.map((n) => n.name).join("|");
+  flowNetworks = snap.networks;
+  map.classList.toggle("has-network", snap.networks.some((n) => n.up && n.enabled));
+  map.classList.toggle("is-flowing", snap.combined.app_speed > 0);
+  if (signature !== flowSignature) {
+    flowSignature = signature;
+    scheduleNetworkFlow();
+  } else {
+    updateFlowRouteStates();
+  }
 }
+
+function scheduleNetworkFlow() {
+  if (flowFrame) cancelAnimationFrame(flowFrame);
+  flowFrame = requestAnimationFrame(() => {
+    flowFrame = 0;
+    renderNetworkFlow();
+  });
+}
+
+function flowPoint(element, bounds) {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left - bounds.left + rect.width / 2,
+    y: rect.top - bounds.top + rect.height / 2,
+  };
+}
+
+function flowPath(start, end, vertical = false) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (!vertical && Math.abs(dx) >= Math.abs(dy)) {
+    return `M ${start.x} ${start.y} C ${start.x + dx * 0.48} ${start.y}, ${end.x - dx * 0.48} ${end.y}, ${end.x} ${end.y}`;
+  }
+  return `M ${start.x} ${start.y} C ${start.x} ${start.y + dy * 0.48}, ${end.x} ${end.y - dy * 0.48}, ${end.x} ${end.y}`;
+}
+
+function addFlowPath(svg, d, className, color) {
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", d);
+  path.setAttribute("class", className);
+  path.setAttribute("stroke", color);
+  svg.appendChild(path);
+  return path;
+}
+
+function renderNetworkFlow() {
+  const map = $("#networkMap");
+  const svg = $("#flowSvg");
+  const bounds = map.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return;
+
+  svg.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
+  svg.replaceChildren();
+  const outputPort = $(`[data-flow-output]`, map);
+  const vertical = window.matchMedia("(max-width: 720px)").matches;
+
+  flowNetworks.forEach((network, i) => {
+    const refs = netEls.get(network.name);
+    if (!refs) return;
+    const d = flowPath(flowPoint(refs.port, bounds), flowPoint(outputPort, bounds), vertical);
+    addFlowPath(svg, d, "flow-route-base", "var(--border)");
+    const route = addFlowPath(svg, d, "flow-route", IFACE_COLORS[i % IFACE_COLORS.length]);
+    route.dataset.network = network.name;
+    route.style.animationDelay = `${i * -0.35}s`;
+  });
+
+  updateFlowRouteStates();
+}
+
+function updateFlowRouteStates() {
+  const enabled = new Map(flowNetworks.map((n) => [n.name, n.up && n.enabled]));
+  $$(".flow-route[data-network]").forEach((path) => {
+    path.classList.toggle("is-muted", !enabled.get(path.dataset.network));
+  });
+}
+
+window.addEventListener("resize", scheduleNetworkFlow, { passive: true });
 
 async function toggleIface(name, on) {
   const s = state.snap.settings;

@@ -45,24 +45,21 @@
 
   <!-- ------------------------- NETWORK PANEL ------------------------- -->
   <aside class="net-panel" id="netPanel">
-    <div class="net-combined card">
-      <div class="net-combined-top">
-        <div>
-          <div class="label">Combined speed</div>
-          <div class="big-speed"><span class="arrow down">↓</span><b id="comboSpeed">—</b></div>
-          <div class="sub-speed"><span class="arrow up">↑</span><span id="comboTx">—</span> <span class="sep">·</span> <span id="comboIfaces">0 networks</span></div>
-        </div>
-        <div class="spark-wrap"><svg id="spark" viewBox="0 0 120 44" preserveAspectRatio="none"><polyline id="sparkLine" fill="none" stroke="url(#sparkGrad)" stroke-width="2" points=""/><defs><linearGradient id="sparkGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#818cf8"/></linearGradient></defs><polyline id="sparkFill" fill="url(#sparkGrad)" stroke="none" points=""/></svg></div>
-      </div>
-      <div class="net-combined-foot">
-        <span><i class="dot dot-live"></i> live throughput</span>
-        <span id="activeConnLabel">0 connections</span>
+    <div class="network-heading">
+      <span class="label">Live network flow</span>
+      <span class="net-count"><b id="netCount">0</b> interfaces</span>
+    </div>
+    <div class="network-map" id="networkMap">
+      <svg class="flow-lines" id="flowSvg" aria-hidden="true" preserveAspectRatio="none"></svg>
+      <div class="net-list" id="netList" role="group" aria-label="Network interfaces"><!-- injected --></div>
+      <div class="flow-output">
+        <i class="flow-port flow-output-port" data-flow-output></i>
+        <div class="flow-output-label">YOUR CONNECTION</div>
+        <div class="flow-output-speed"><span>↓</span><b id="comboSpeed">—</b></div>
+        <div class="flow-output-state"><i class="dot dot-live"></i><span id="comboIfaces">0 networks active</span></div>
+        <div class="flow-output-meta"><span id="comboTx">↑ —</span><span id="activeConnLabel">0 connections</span></div>
       </div>
     </div>
-
-    <div class="net-title">Networks <span class="net-count" id="netCount">0</span></div>
-    <div class="net-list" id="netList"><!-- injected --></div>
-    <div class="net-hint" id="netHint">Downloads are split across every enabled network in parallel. Toggle a network off to exclude it.</div>
   </aside>
 
   <!-- ---------------------------- CONTENT ---------------------------- -->
