@@ -22,6 +22,12 @@ priorities, and a live web UI are built in.
 - **Live web UI** — single-page dark-themed interface with SSE real-time progress,
   combined and per-NIC speed readouts, and a server-side directory browser.
 
+## Screenshots
+
+| Desktop | Mobile |
+|:--:|:--:|
+| ![Unique Download Manager desktop interface](docs/desktop.png) | ![Unique Download Manager mobile interface](docs/mobile.png) |
+
 ## Quick start
 
 ```sh
