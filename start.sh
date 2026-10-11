@@ -30,13 +30,13 @@ done
 
 
 # Check if Python >= 3.10 is available
-if ! command -v python3 &> /dev/null; then
+if ! command -v python &> /dev/null; then
     echo "❌ Error: Python 3 is not installed or not in PATH."
     echo "   Please install Python 3.10 or higher before running this script."
     exit 1
 fi
 
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+if ! python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
     echo "❌ Error: Python 3.10 or higher is required."
     echo "   Please upgrade your Python installation."
     exit 1
@@ -112,7 +112,7 @@ else
     read -p "Do you want to create it now? [y/N]: " create_venv
     case "$create_venv" in
         y|Y )
-            python3.10 -m venv venv
+            python -m venv venv
             echo "✅ Virtual environment 'venv' created."
             source venv/bin/activate
             echo "📥 Installing dependencies..."
